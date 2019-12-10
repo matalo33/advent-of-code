@@ -20,3 +20,21 @@ func TestFuelRequired(t *testing.T) {
     }
   }
 }
+
+func TestFuelRequiredWithFuel(t *testing.T) {
+  fuelTests := []struct {
+    mass int
+    fuel int
+  }{
+    {14, 2},
+    {1969, 966},
+    {100756, 50346},
+  }
+
+  for _, ship := range fuelTests {
+    got := fuelRequiredWithFuel(ship.mass)
+    if got != ship.fuel {
+      t.Errorf("got %v want %v", got, ship.fuel)
+    }
+  }
+}
