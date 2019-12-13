@@ -27,7 +27,11 @@ func main() {
   opcode[1] = 12
   opcode[2] = 2
   result := intcodeMachine(opcode)
-  fmt.Printf("Position 0: %v", result[0])
+  fmt.Printf("Position 0: %v\n", result[0])
+
+  op2 := convertStrArrayToIntArray(line)
+  noun, verb := findInputForOutput(op2, 19690720)
+  fmt.Printf("Noun %v, Verb %v\n", noun, verb)
 }
 
 func convertStrArrayToIntArray(input []string) []int {
@@ -50,8 +54,23 @@ func intcodeMachine(op []int) []int {
     case 2:
       op[op[p+3]] = op[op[p+1]] * op[op[p+2]]
     default:
-      log.Fatal("OOPS")
+      log.Fatalf("OOPS %v", op[p])
     }
   }
   return op
+}
+
+func findInputForOutput(op []int, target int) (int, int) {
+  for noun := 0; noun < len(op); noun++ {
+    for verb := 0; verb < len(op); verb++ {
+      newOp := make([]int, len(op))
+      copy(newOp, op)
+      newOp[1] = noun
+      newOp[2] = verb
+      if intcodeMachine(newOp)[0] == target {
+        return noun, verb
+      }
+    }
+  }
+  return 0, 0
 }
