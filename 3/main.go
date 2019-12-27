@@ -27,74 +27,89 @@ func main() {
     line1 := reader.Text()
     reader.Scan() // 2 lines per scenario
     line2 := reader.Text()
-    fmt.Printf("Manhattan Distance: %v", manhattanDistance(line1, line2))
+    manhattanDistance, shortestDistance := manhattanDistance(line1, line2)
+    fmt.Printf("Manhattan Distance: %v, Shortest Distance: %v", manhattanDistance, shortestDistance)
   }
 }
 
-func manhattanDistance(wire1, wire2 string) int {
+func manhattanDistance(wire1, wire2 string) (int, int) {
   grid := make(map[Vect]int)
   pos := Vect{}
-  nearestManhattan := math.MaxInt32
+  nearestManhattan, shortestDistance := math.MaxInt32, math.MaxInt32
+  steps := 0
 
   for _, section := range strings.Split(wire1, ",") {
     switch section[0] {
     case 'U':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x, pos.y + 1}
-        grid[pos] = 1
+        steps++
+        grid[pos] = steps
       }
     case 'D':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x, pos.y - 1}
-        grid[pos] = 1
+        steps++
+        grid[pos] = steps
       }
     case 'L':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x - 1, pos.y}
-        grid[pos] = 1
+        steps++
+        grid[pos] = steps
       }
     case 'R':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x + 1, pos.y}
-        grid[pos] = 1
+        steps++
+        grid[pos] = steps
       }
     }
   }
 
   pos = Vect{}
+  currentSteps := 0
   for _, section := range strings.Split(wire2, ",") {
     switch section[0] {
     case 'U':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x, pos.y + 1}
+        currentSteps++
         if grid[pos] != 0 {
           nearestManhattan = min(getDistance(pos), nearestManhattan)
+          shortestDistance = min(currentSteps + grid[pos], shortestDistance)
         }
       }
     case 'D':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x, pos.y - 1}
+        currentSteps++
         if grid[pos] != 0 {
           nearestManhattan = min(getDistance(pos), nearestManhattan)
+          shortestDistance = min(currentSteps + grid[pos], shortestDistance)
         }
       }
     case 'L':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x - 1, pos.y}
+        currentSteps++
         if grid[pos] != 0 {
           nearestManhattan = min(getDistance(pos), nearestManhattan)
+          shortestDistance = min(currentSteps + grid[pos], shortestDistance)
         }
       }
     case 'R':
       for i := 0; i < strToInt(section[1:]); i++ {
         pos = Vect{pos.x + 1, pos.y}
+        currentSteps++
         if grid[pos] != 0 {
           nearestManhattan = min(getDistance(pos), nearestManhattan)
+          shortestDistance = min(currentSteps + grid[pos], shortestDistance)
         }
       }
     }
   }
-  return nearestManhattan
+  return nearestManhattan, shortestDistance
 }
 
 func strToInt (str string) int {
