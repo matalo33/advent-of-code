@@ -23,9 +23,11 @@ func main() {
 
   opcode := convertStrArrayToIntArray(line)
 
-  // Part 1
   result := intcodeMachine(opcode, []int{1})
+  result2 := intcodeMachine(opcode, []int{5})
+
   fmt.Printf("Part 1 output: %v\n", result)
+  fmt.Printf("Part 2 output: %v\n", result2)
 }
 
 func convertStrArrayToIntArray(input []string) []int {
@@ -70,30 +72,71 @@ func intcodeMachine(op, input []int) (output []int) {
     }
 
     switch opcode {
-    case 1:
+    case 1: // ADD
       fmt.Printf("CODE 1: %v, 1: %v, 2: %v, 3: %v\n", memory[pc], memory[pc+1], memory[pc+2], memory[pc+3])
       a, b := getParam(1), getParam(2)
       c := memory[pc+3]
       memory[c] = a + b
       fmt.Printf("Storing %v + %v (%v) at memory %v\n", a, b, a+b, c)
       pc += 4
-    case 2:
+
+    case 2: // MULTIPLY
       fmt.Printf("CODE 2: %v, 1: %v, 2: %v, 3: %v\n", memory[pc], memory[pc+1], memory[pc+2], memory[pc+3])
       a, b := getParam(1), getParam(2)
       c := memory[pc+3]
       memory[c] = a * b
       fmt.Printf("Storing %v + %v (%v) at memory %v\n", a, b, a+b, c)
       pc += 4
-    case 3:
+
+    case 3: // INPUT
       a := memory[pc+1]
       memory[a] = input[0]
       pc += 2
-    case 4:
+
+    case 4: // OUTPUT
       a := getParam(1)
       output = append(output, a)
       pc += 2
+
+    case 5: // JUMP IF TRUE
+      a, b := getParam(1), getParam(2)
+      if a != 0 {
+        pc = b
+      } else {
+        pc += 3
+      }
+
+    case 6: // JUMP IF FALSE
+      a, b := getParam(1), getParam(2)
+      if a == 0 {
+        pc = b
+      } else {
+        pc += 3
+      }
+
+    case 7: // LESS THAN
+      a, b := getParam(1), getParam(2)
+      c := memory[pc+3]
+      if a < b {
+        memory[c] = 1
+      } else {
+        memory[c] = 0
+      }
+      pc += 4
+
+    case 8: // EQUAL
+      a, b := getParam(1), getParam(2)
+      c := memory[pc+3]
+      if a == b {
+        memory[c] = 1
+      } else {
+        memory[c] = 0
+      }
+      pc += 4
+
     case 99:
       return output
+
     default:
       log.Fatalf("OOPS %v", memory[pc])
     }
