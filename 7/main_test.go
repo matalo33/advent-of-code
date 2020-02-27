@@ -28,7 +28,7 @@ func TestIntcodeMachine(t *testing.T) {
   }
 
   for _, opcode := range opcodeTests {
-    got := calculateThrustSignal(opcode.input)
+    got := calculateSeriesThrustSignal(opcode.input)
     if got != opcode.output {
       t.Errorf("got %v want %v", got, opcode.output)
     }
