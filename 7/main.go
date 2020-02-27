@@ -43,7 +43,6 @@ func calculateThrustSignal(opcode []int) (thrustSignal int) {
   for _, signal := range signals {
     ampOutput = 0
     for amp := 0; amp <=4; amp++ {
-      //fmt.Printf("Running on code %v, amp %v, phase %v, input %v\n", signal, amp, signal[amp], ampOutput)
       ampOutput = intcodeMachine(opcode, []int{signal[amp], ampOutput})
     }
     if ampOutput > highAmpOutput {
@@ -54,7 +53,7 @@ func calculateThrustSignal(opcode []int) (thrustSignal int) {
 }
 
 func intcodeMachine(op, input []int) (output int) {
-  pc := 0
+  pc, inputPc := 0, 0
   memory := make([]int, len(op))
   copy(memory, op)
 
@@ -98,9 +97,8 @@ func intcodeMachine(op, input []int) (output int) {
 
     case 3: // INPUT
       a := memory[pc+1]
-      memory[a] = input[0]
-      // Read it first time then pop 2nd input into 1st position
-      input[0] = input[1]
+      memory[a] = input[inputPc]
+      inputPc++
       pc += 2
 
     case 4: // OUTPUT
