@@ -29,10 +29,10 @@ func main() {
 
 	opcode := convertStrArrayToIntArray(line)
 	signal := calculateSeriesThrustSignal(opcode)
-	feedbackSignal := calculateFeedbackThrustSignal(opcode)
+	//feedbackSignal := calculateFeedbackThrustSignal(opcode)
 
 	fmt.Printf("Thruster signal: %v\n", signal)
-	fmt.Printf("Feedback mode thruster signal: %v\n", feedbackSignal)
+	//fmt.Printf("Feedback mode thruster signal: %v\n", feedbackSignal)
 }
 
 func convertStrArrayToIntArray(input []string) []int {
@@ -58,27 +58,37 @@ func calculateThrustSignal(opcode []int, signals [][]int, feedbackMode bool) (th
 	ampOutput, highAmpOutput := 0, 0
 
 	for _, signal := range signals { // For each permutation of signal
-		ampOutput = 0  // Reset last amp output
-		var amps []Amp // Create a new set of amps
+		fmt.Printf("Run ")
+		amps := make([]Amp, 5) // Create a new collection for amps
 		for amp := 0; amp < 5; amp++ {
 			memory := make([]int, len(opcode))
 			copy(memory, opcode) // Crate memory for new amp
 			// Add new amp to collection
-			amps = append(amps, Amp{
+			amps[amp] = Amp{
 				false,
 				signal[amp],
 				memory,
-			})
-			ampOutput = intcodeMachine(amps[amp], ampOutput)
+			}
 		}
-		if ampOutput > highAmpOutput {
-			highAmpOutput = ampOutput
+
+		currentAmp := 0
+		ampOutput = 0 // Reset last amp output
+		for {         // Enter infinite loop
+			ampOutput, ampFinished := intcodeMachine(amps[currentAmp], ampOutput) // Run amp
+			if ampOutput > highAmpOutput {
+				highAmpOutput = ampOutput
+			}
+			fmt.Printf("currentAmp: %v, finished: %v, ampoutput: %v\n", currentAmp, ampFinished, ampOutput)
+			if (currentAmp == 4) && (ampFinished) {
+				break
+			}
+			currentAmp = (currentAmp + 1) % 5 // Increment by 1, capped at 5
 		}
 	}
 	return highAmpOutput
 }
 
-func intcodeMachine(amp Amp, input int) (output int) {
+func intcodeMachine(amp Amp, input int) (output int, finished bool) {
 	pc, inputPc := 0, 0
 
 	for {
@@ -172,7 +182,7 @@ func intcodeMachine(amp Amp, input int) (output int) {
 			pc += 4
 
 		case 99:
-			return output
+			return output, true
 
 		default:
 			log.Fatalf("OOPS %v", amp.memory[pc])
