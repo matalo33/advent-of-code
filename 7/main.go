@@ -74,7 +74,8 @@ func calculateThrustSignal(opcode []int, signals [][]int, feedbackMode bool) (th
 		currentAmp := 0
 		ampOutput = 0 // Reset last amp output
 		for {         // Enter infinite loop
-			ampOutput, ampFinished := intcodeMachine(amps[currentAmp], ampOutput) // Run amp
+			ampFinished := false
+			ampOutput, ampFinished = intcodeMachine(amps[currentAmp], ampOutput) // Run amp
 			if ampOutput > highAmpOutput {
 				highAmpOutput = ampOutput
 			}
