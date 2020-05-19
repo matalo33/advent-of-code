@@ -19,8 +19,20 @@ func main() {
 	line, _ := reader.ReadString('\n')
 
 	imageData := convertToImageLayers(line, 25, 6)
+	decodedImage := decodeImageLayers(imageData, 25, 6)
 
-	fmt.Printf("Part 1: %v", checkTransmission(imageData))
+	fmt.Printf("Part 1: %v\n\n", checkTransmission(imageData))
+	fmt.Printf("Part 2: \n")
+	for _, val := range decodedImage {
+		for _, pixel := range val {
+			if pixel == 0 {
+				fmt.Printf("⬛")
+			} else if pixel == 1 {
+				fmt.Printf("⬜")
+			}
+		}
+		fmt.Printf("\n")
+	}
 }
 
 func convertToImageLayers(input string, width int, height int) [][][]int {
@@ -56,6 +68,27 @@ func checkTransmission(imageData [][][]int) int {
 			fewestZeroCount = data[layer][0]
 		}
 	}
-
 	return data[fewestZeroLayer][1] * data[fewestZeroLayer][2]
+}
+
+// Part 2
+func decodeImageLayers(imageData [][][]int, width int, height int) [][]int {
+	decodedImage := make([][]int, height)
+	for x := 0; x < height; x++ {
+		decodedImage[x] = make([]int, width)
+		for y := 0; y < width; y++ {
+			// Every cell starts as transparent
+			decodedImage[x][y] = 2
+		}
+	}
+	for layer := 0; layer < len(imageData); layer++ {
+		for x := 0; x < height; x++ {
+			for y := 0; y < width; y++ {
+				if decodedImage[x][y] == 2 {
+					decodedImage[x][y] = imageData[layer][x][y]
+				}
+			}
+		}
+	}
+	return decodedImage
 }
