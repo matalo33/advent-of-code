@@ -5,15 +5,16 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 )
 
-type Amp struct {
-	initialised bool
-	signal      int
-	memory      []int
-	pc          int
+type amp struct {
+	memory []int
+	pc     int
+	offset int
+	debug  bool
 }
 
 func main() {
@@ -29,11 +30,7 @@ func main() {
 	}
 
 	opcode := convertStrArrayToIntArray(line)
-	signal := calculateSeriesThrustSignal(opcode)
-	feedbackSignal := calculateFeedbackThrustSignal(opcode)
-
-	fmt.Printf("Thruster signal: %v\n", signal)
-	fmt.Printf("Feedback mode thruster signal: %v\n", feedbackSignal)
+	fmt.Printf("BOOST Keycode: %v", checkIntcodeMachine(opcode, 1, true))
 }
 
 func convertStrArrayToIntArray(input []string) []int {
@@ -45,110 +42,129 @@ func convertStrArrayToIntArray(input []string) []int {
 	return result
 }
 
-func calculateSeriesThrustSignal(opcode []int) (thrustSignal int) {
-	signals := permutations([]int{0, 1, 2, 3, 4})
-	return calculateThrustSignal(opcode, signals, false)
+func checkIntcodeMachine(opcode []int, input int, debug bool) []int {
+	memory := make([]int, math.MaxInt16)
+	copy(memory, opcode)
+	amp := amp{
+		memory,
+		0,
+		0,
+		debug,
+	}
+
+	result, _ := intcodeMachine(&amp, input)
+	return result
 }
 
-func calculateFeedbackThrustSignal(opcode []int) (thrustSignal int) {
-	signals := permutations([]int{5, 6, 7, 8, 9})
-	return calculateThrustSignal(opcode, signals, true)
-}
+func intcodeMachine(amp *amp, input int) (output []int, finished bool) {
 
-func calculateThrustSignal(opcode []int, signals [][]int, feedbackMode bool) (thrustSignal int) {
-	ampOutput, highAmpOutput := 0, 0
+	// Retrieve a parameter abiding by the current parameter mode
+	getParam := func(pos int, rw string) int {
+		// amp.pc is always the opcode
+		// pos is the forward offset from amp.pc from which to get the value
+		parameter := amp.memory[amp.pc+pos]
 
-	for _, signal := range signals { // For each permutation of signal
-		amps := make([]Amp, 5) // Create a new collection for amps
-		for amp := 0; amp < 5; amp++ {
-			memory := make([]int, len(opcode))
-			copy(memory, opcode) // Crate memory for new amp
-			// Add new amp to collection
-			amps[amp] = Amp{
-				false,
-				signal[amp],
-				memory,
-				0,
-			}
+		// Now that we have parameter using pos, pos is now used to determine the mode of this parameter
+		// pos is used as 1-indexed and the opcode is always 2 chars long
+		// Add 1 to the pos and we have the position of this parameters mode
+		pos++
+
+		// Stringify the opcode and reverse it
+		paramCode := reverse(strconv.Itoa(amp.memory[amp.pc]))
+
+		// If not defined, parameter mode is 0
+		mode := "0"
+
+		// If defined, get the parameter mode
+		if len(paramCode) > pos {
+			mode = string(paramCode[pos])
 		}
 
-		currentAmp := 0
-		ampOutput = 0 // Reset last amp output
-		for {         // Enter infinite loop
-			ampFinished := false
-			ampOutput, ampFinished = intcodeMachine(&amps[currentAmp], ampOutput, feedbackMode)
-			if ampOutput > highAmpOutput {
-				highAmpOutput = ampOutput
+		// "Parameters that an instruction writes to will never be in immediate mode"
+		if rw == "w" && mode == "1" {
+			mode = "0"
+		}
+
+		switch mode {
+		// POSITION MODE: The parameter is a position
+		// Return the value stored in memory at the position
+		case "0":
+			if amp.debug {
+				fmt.Printf("param: %v, rw: %v, mode: %v\n", pos-1, rw, mode)
 			}
-			if (currentAmp == 4) && (ampFinished) {
-				break
+			return amp.memory[parameter]
+
+		// IMMEDIATE MODE: The parameter is the value
+		// Return the parameter
+		case "1":
+			if amp.debug {
+				fmt.Printf("param: %v, rw: %v, mode: %v\n", pos-1, rw, mode)
 			}
-			currentAmp = (currentAmp + 1) % 5 // Increment by 1, capped at 5
+			return parameter
+
+		// RELATIVE MODE: As position mode, but offset from the relative base
+		// Return the value stored in memory offset by the relative offset
+		case "2":
+			if amp.debug {
+				fmt.Printf("param: %v, rw: %v, mode: %v\n", pos-1, rw, mode)
+			}
+			return amp.memory[amp.offset+parameter]
+
+		default:
+			panic("Received an invalid parameter mode")
 		}
 	}
-	return highAmpOutput
-}
 
-func intcodeMachine(amp *Amp, input int, feedbackMode bool) (output int, finished bool) {
-
+	//Infinite loop. Opcode 99 will exit
 	for {
+
+		// Two Rightmost (ones, tens) values in opcode make up the instruction
 		opcode := amp.memory[amp.pc] % 100
 
-		getParam := func(pos int) int {
-			parameter := amp.memory[amp.pc+pos]
-			paramCode := reverse(strconv.Itoa(amp.memory[amp.pc]))
-			pos++ // opcode is 2 chars long, pos is 1 indexed
-
-			mode := "0"
-			if len(paramCode) > pos {
-				mode = string(paramCode[pos])
-			}
-
-			switch mode {
-			case "0":
-				return amp.memory[parameter]
-			case "1":
-				return parameter
-			default:
-				panic("foo")
-			}
-		}
-
 		switch opcode {
+
 		case 1: // ADD
-			a, b := getParam(1), getParam(2)
-			c := amp.memory[amp.pc+3]
+			a, b, c := getParam(1, "r"), getParam(2, "r"), getParam(3, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v, c: %v\n", a, b, c)
+				fmt.Printf("Opcode: ADD : %v\n\n", amp.memory[amp.pc:amp.pc+4])
+			}
 			amp.memory[c] = a + b
 			amp.pc += 4
 
 		case 2: // MULTIPLY
-			a, b := getParam(1), getParam(2)
-			c := amp.memory[amp.pc+3]
+			a, b, c := getParam(1, "r"), getParam(2, "r"), getParam(3, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v, c: %v\n", a, b, c)
+				fmt.Printf("Opcode: MULTIPLY : %v\n\n", amp.memory[amp.pc:amp.pc+4])
+			}
 			amp.memory[c] = a * b
 			amp.pc += 4
 
 		case 3: // INPUT
-			if !amp.initialised {
-				a := amp.memory[amp.pc+1]
-				amp.memory[a] = amp.signal
-				amp.pc += 2
-				amp.initialised = true
-			} else {
-				a := amp.memory[amp.pc+1]
-				amp.memory[a] = input
-				amp.pc += 2
+			a := getParam(1, "w")
+			if amp.debug {
+				fmt.Printf("a: %v\n", a)
+				fmt.Printf("Opcode: INPUT : %v\n\n", amp.memory[amp.pc:amp.pc+2])
 			}
+			amp.memory[a] = input
+			amp.pc += 2
 
 		case 4: // OUTPUT
-			a := getParam(1)
-			output = a
-			amp.pc += 2
-			if feedbackMode {
-				return output, false
+			a := getParam(1, "r")
+			if amp.debug {
+				fmt.Printf("a: %v\n", a)
+				fmt.Printf("Opcode: OUTPUT : %v\n\n", amp.memory[amp.pc:amp.pc+2])
 			}
+			output = append(output, a)
+			amp.pc += 2
 
 		case 5: // JUMP IF TRUE
-			a, b := getParam(1), getParam(2)
+			a, b := getParam(1, "r"), getParam(2, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v\n", a, b)
+				fmt.Printf("Opcode: JTRUE : %v\n\n", amp.memory[amp.pc:amp.pc+3])
+			}
 			if a != 0 {
 				amp.pc = b
 			} else {
@@ -156,7 +172,11 @@ func intcodeMachine(amp *Amp, input int, feedbackMode bool) (output int, finishe
 			}
 
 		case 6: // JUMP IF FALSE
-			a, b := getParam(1), getParam(2)
+			a, b := getParam(1, "r"), getParam(2, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v\n", a, b)
+				fmt.Printf("Opcode: JFALSE : %v\n\n", amp.memory[amp.pc:amp.pc+3])
+			}
 			if a == 0 {
 				amp.pc = b
 			} else {
@@ -164,8 +184,11 @@ func intcodeMachine(amp *Amp, input int, feedbackMode bool) (output int, finishe
 			}
 
 		case 7: // LESS THAN
-			a, b := getParam(1), getParam(2)
-			c := amp.memory[amp.pc+3]
+			a, b, c := getParam(1, "r"), getParam(2, "r"), getParam(3, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v, c: %v\n", a, b, c)
+				fmt.Printf("Opcode: LESS : %v\n\n", amp.memory[amp.pc:amp.pc+4])
+			}
 			if a < b {
 				amp.memory[c] = 1
 			} else {
@@ -174,8 +197,11 @@ func intcodeMachine(amp *Amp, input int, feedbackMode bool) (output int, finishe
 			amp.pc += 4
 
 		case 8: // EQUAL
-			a, b := getParam(1), getParam(2)
-			c := amp.memory[amp.pc+3]
+			a, b, c := getParam(1, "r"), getParam(2, "r"), getParam(3, "w")
+			if amp.debug {
+				fmt.Printf("a: %v, b: %v, c: %v\n", a, b, c)
+				fmt.Printf("Opcode: EQUAL : %v\n\n", amp.memory[amp.pc:amp.pc+4])
+			}
 			if a == b {
 				amp.memory[c] = 1
 			} else {
@@ -183,11 +209,24 @@ func intcodeMachine(amp *Amp, input int, feedbackMode bool) (output int, finishe
 			}
 			amp.pc += 4
 
+		case 9: // ADJUST OFFSET
+			a := getParam(1, "r")
+			if amp.debug {
+				fmt.Printf("a: %v\n", a)
+				fmt.Printf("Opcode: OFFSET : %v\n", amp.memory[amp.pc:amp.pc+2])
+				fmt.Printf("Offset becomes %v\n\n", amp.offset+a)
+			}
+			amp.offset += a
+			amp.pc += 2
+
 		case 99:
 			return output, true
 
 		default:
-			log.Fatalf("OOPS %v", amp.memory[amp.pc])
+			if amp.debug {
+				fmt.Printf("OOPS: %v\n", opcode)
+			}
+			log.Fatalf("Tried to switch on an invalid opcode: %v\n", amp.memory[amp.pc])
 		}
 	}
 }
@@ -198,33 +237,4 @@ func reverse(s string) string {
 		rs[i], rs[j] = rs[j], rs[i]
 	}
 	return string(rs)
-}
-
-// From https://stackoverflow.com/a/30226442
-func permutations(arr []int) [][]int {
-	var helper func([]int, int)
-	res := [][]int{}
-
-	helper = func(arr []int, n int) {
-		if n == 1 {
-			tmp := make([]int, len(arr))
-			copy(tmp, arr)
-			res = append(res, tmp)
-		} else {
-			for i := 0; i < n; i++ {
-				helper(arr, n-1)
-				if n%2 == 1 {
-					tmp := arr[i]
-					arr[i] = arr[n-1]
-					arr[n-1] = tmp
-				} else {
-					tmp := arr[0]
-					arr[0] = arr[n-1]
-					arr[n-1] = tmp
-				}
-			}
-		}
-	}
-	helper(arr, len(arr))
-	return res
 }
